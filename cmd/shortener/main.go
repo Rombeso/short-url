@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -38,7 +39,7 @@ func webhook(w http.ResponseWriter, r *http.Request) {
 		}
 
 		requestBody := string(body)
-		_, err = url.ParseRequestURI(requestBody)
+		err = validateUrl(requestBody)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(fmt.Sprintf("Ошибка при чтении URL: %v", err)))
@@ -69,7 +70,7 @@ func addUrl(requestBody string) string {
 	var shortUrl string
 	for {
 		shortUrl = generateUrl(8)
-		checkUrl := urls[requestBody]
+		checkUrl := urls[shortUrl]
 		if checkUrl != "" {
 			continue
 		}
@@ -81,8 +82,7 @@ func addUrl(requestBody string) string {
 
 func readUrl(requestBody string) (string, error) {
 	if len(urls) == 0 {
-		return "", errors.New("Пока нет закладок, добавьте корректный URL")
-
+		return "", errors.New("Пока нет ссылок, добавьте корректный URL")
 	}
 
 	shortUrl := urls[requestBody]
@@ -104,10 +104,27 @@ func generateUrl(n int) string {
 
 func extractIdFromUrl(r *http.Request) string {
 	path := r.URL.Path
-	id := strings.TrimPrefix(path, "/") // Удаляем начальный слеш, если он есть
+	id := strings.TrimPrefix(path, "/")
 	return id
 }
 
 func getBaseUrl(r *http.Request) string {
 	return "http://" + r.Host
+}
+
+func validateUrl(req string) error {
+	u, err := url.ParseRequestURI(req)
+	if err != nil {
+		return errors.New("ошибка парсинга URL")
+	}
+	host := u.Host
+	if host == "" {
+		return errors.New("HOST не указан")
+	}
+
+	var hostRegex = regexp.MustCompile(`^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	if !hostRegex.MatchString(host) {
+		return errors.New("Некорректный формат HOST")
+	}
+	return nil
 }
